@@ -95,7 +95,7 @@ function extractToolCalls(
   toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[]
 ): ToolCallResult[] {
   // TODO: map token ranges once we correlate logprobs to tool call boundaries
-  return toolCalls.map((tc, i) => ({
+  return toolCalls.map((tc) => ({
     id: tc.id,
     name: tc.function.name,
     arguments: JSON.parse(tc.function.arguments),

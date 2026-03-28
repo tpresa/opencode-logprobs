@@ -75,12 +75,12 @@ function toTogetherTool(tool: ToolDef) {
   };
 }
 
-function extractTokenLogprobs(choice: unknown): TokenLogprob[] {
+function extractTokenLogprobs(_choice: unknown): TokenLogprob[] {
   // TODO: extract from Together's logprobs response format
   return [];
 }
 
-function extractToolCalls(choice: unknown): ToolCallResult[] {
+function extractToolCalls(_choice: unknown): ToolCallResult[] {
   // TODO: extract tool calls from Together's OpenAI-compatible response
   return [];
 }
