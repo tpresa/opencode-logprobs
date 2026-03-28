@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregate, score, confidenceBar, formatConfidence, isFlagged, extractContentTokens } from "./scoring.js";
+import { aggregate, score, confidenceBar, formatConfidence, isFlagged } from "./scoring.js";
 import type { GenerationResult } from "./providers/types.js";
 
 describe("aggregate", () => {

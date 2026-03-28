@@ -7,10 +7,9 @@ import {
   runSingleTurn,
   runEnsembleTurn,
   applySelections,
-  addUserMessage,
 } from "./agent.js";
 import { confidenceBar, formatConfidence, isFlagged } from "./scoring.js";
-import { swapPick, type Selection } from "./ensemble/index.js";
+import { type Selection } from "./ensemble/index.js";
 import type { Provider, Config, GenerationResult } from "./providers/types.js";
 import type { Scores } from "./scoring.js";
 import { DEFAULT_CONFIG } from "./providers/types.js";
@@ -248,7 +247,7 @@ async function loadConfig(_path?: string): Promise<Config> {
 
 // ── Provider initialization ──
 
-async function initProviders(config: Config, options: CLIOptions): Promise<Provider[]> {
+async function initProviders(_config: Config, _options: CLIOptions): Promise<Provider[]> {
   // TODO: instantiate providers based on config and available API keys
   // For now, return empty — will be wired in M1
   console.log(chalk.yellow("⚠ Provider initialization not yet implemented — using stubs."));
