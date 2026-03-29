@@ -5,7 +5,6 @@ import {
   createProvider,
   initProviders,
   OpenAIProvider,
-  GoogleProvider,
   TogetherProvider,
 } from "./index.js";
 import { DEFAULT_CONFIG } from "./types.js";
