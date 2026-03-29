@@ -12,7 +12,7 @@ import { confidenceBar, formatConfidence, isFlagged } from "./scoring.js";
 import { type Selection } from "./ensemble/index.js";
 import type { Provider, Config, GenerationResult } from "./providers/types.js";
 import type { Scores } from "./scoring.js";
-import { DEFAULT_CONFIG } from "./providers/types.js";
+import { loadConfig } from "./config.js";
 import { createInterface } from "node:readline";
 
 // ── CLI entry point ──
@@ -236,13 +236,6 @@ function promptAction(validKeys: string[], label: string): Promise<string> {
       }
     });
   });
-}
-
-// ── Config loading ──
-
-async function loadConfig(_path?: string): Promise<Config> {
-  // TODO: load from ~/.config/conf-agent/config.json or provided path via cosmiconfig
-  return DEFAULT_CONFIG;
 }
 
 // ── Provider initialization ──
