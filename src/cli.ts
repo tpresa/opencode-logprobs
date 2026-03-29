@@ -14,6 +14,7 @@ import { swapPick, type Selection } from "./ensemble/index.js";
 import type { Provider, Config, GenerationResult } from "./providers/types.js";
 import type { Scores } from "./scoring.js";
 import { loadConfig } from "./config.js";
+import { initProviders } from "./providers/index.js";
 import { createInterface } from "node:readline";
 
 // ── CLI entry point ──
@@ -48,8 +49,15 @@ interface CLIOptions {
 
 async function run(prompt: string, options: CLIOptions): Promise<void> {
   const config = await loadConfig(options.config);
-  const providers = await initProviders(config, options);
   const mode = options.ensemble || config.ensemble.enabled ? "ensemble" : "single";
+
+  let providers: Provider[];
+  try {
+    providers = initProviders(config, { ...options, mode });
+  } catch (err) {
+    console.error(chalk.red(`Error: ${(err as Error).message}`));
+    process.exit(1);
+  }
 
   const state: AgentState = {
     messages: [{ role: "user", content: prompt }],
@@ -237,15 +245,6 @@ function promptAction(validKeys: string[], label: string): Promise<string> {
       }
     });
   });
-}
-
-// ── Provider initialization ──
-
-async function initProviders(config: Config, options: CLIOptions): Promise<Provider[]> {
-  // TODO: instantiate providers based on config and available API keys
-  // For now, return empty — will be wired in M1
-  console.log(chalk.yellow("⚠ Provider initialization not yet implemented — using stubs."));
-  return [];
 }
 
 // ── Helpers ──
