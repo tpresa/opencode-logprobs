@@ -88,12 +88,25 @@ export function createProvider(
 
 export function initProviders(
   config: Config,
-  options: { model?: string },
+  options: { model?: string; mode: "single" | "ensemble" },
 ): Provider[] {
   if (options.model) {
     return initSingleOverride(config, options.model);
   }
-  return initFromConfig(config);
+
+  const valid = collectValidProviders(config);
+
+  if (options.mode === "single") {
+    return [valid[0]];
+  }
+
+  const { maxModels } = config.ensemble;
+  if (!Number.isInteger(maxModels) || maxModels < 1) {
+    throw new Error(
+      `ensemble.maxModels must be a positive integer, got ${maxModels}`,
+    );
+  }
+  return valid.slice(0, maxModels);
 }
 
 function initSingleOverride(config: Config, modelOverride: string): Provider[] {
@@ -115,7 +128,7 @@ function initSingleOverride(config: Config, modelOverride: string): Provider[] {
   return [createProvider(entry.provider, entry.model, apiKey)];
 }
 
-function initFromConfig(config: Config): Provider[] {
+function collectValidProviders(config: Config): Provider[] {
   const providers: Provider[] = [];
 
   for (const entry of config.models) {
@@ -140,5 +153,5 @@ function initFromConfig(config: Config): Provider[] {
     );
   }
 
-  return providers.slice(0, config.ensemble.maxModels);
+  return providers;
 }

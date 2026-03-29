@@ -121,13 +121,20 @@ describe("createProvider", () => {
 describe("initProviders with --model", () => {
   it("returns single provider when model found and key available", () => {
     vi.stubEnv("OPENAI_API_KEY", "sk-test");
-    const providers = initProviders(makeConfig(), { model: "gpt-4.1" });
+    const providers = initProviders(makeConfig(), { model: "gpt-4.1", mode: "single" });
+    expect(providers).toHaveLength(1);
+    expect(providers[0].id).toBe("openai");
+  });
+
+  it("ignores mode when --model is set", () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-test");
+    const providers = initProviders(makeConfig(), { model: "gpt-4.1", mode: "ensemble" });
     expect(providers).toHaveLength(1);
     expect(providers[0].id).toBe("openai");
   });
 
   it("throws when model not found in config", () => {
-    expect(() => initProviders(makeConfig(), { model: "gpt-5" })).toThrow(
+    expect(() => initProviders(makeConfig(), { model: "gpt-5", mode: "single" })).toThrow(
       /Model "gpt-5" not found in config/,
     );
   });
@@ -137,6 +144,7 @@ describe("initProviders with --model", () => {
     expect(() =>
       initProviders(makeConfig({ keys: { openai: null, google: null, together: null } }), {
         model: "gpt-4.1",
+        mode: "single",
       }),
     ).toThrow(/No API key for provider "openai"/);
   });
@@ -146,19 +154,56 @@ describe("initProviders with --model", () => {
     expect(() =>
       initProviders(makeConfig({ keys: { openai: null, google: null, together: null } }), {
         model: "gemini-2.5-pro",
+        mode: "single",
       }),
     ).toThrow(/GOOGLE_API_KEY/);
   });
 });
 
-// ── initProviders from config ──
+// ── initProviders — single mode ──
 
-describe("initProviders from config", () => {
+describe("initProviders — single mode", () => {
+  it("returns exactly one provider", () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-1");
+    vi.stubEnv("GOOGLE_API_KEY", "gk-1");
+    vi.stubEnv("TOGETHER_API_KEY", "tk-1");
+    const providers = initProviders(makeConfig(), { mode: "single" });
+    expect(providers).toHaveLength(1);
+    expect(providers[0].id).toBe("openai");
+  });
+
+  it("picks first configured model with valid key", () => {
+    delete process.env.OPENAI_API_KEY;
+    vi.stubEnv("GOOGLE_API_KEY", "gk-1");
+    vi.stubEnv("TOGETHER_API_KEY", "tk-1");
+    const providers = initProviders(
+      makeConfig({ keys: { openai: null, google: null, together: null } }),
+      { mode: "single" },
+    );
+    expect(providers).toHaveLength(1);
+    expect(providers[0].id).toBe("google");
+  });
+
+  it("is not affected by maxModels", () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-1");
+    const config = makeConfig({
+      ensemble: { ...DEFAULT_CONFIG.ensemble, maxModels: 0 },
+      keys: { openai: null, google: null, together: null },
+    });
+    const providers = initProviders(config, { mode: "single" });
+    expect(providers).toHaveLength(1);
+    expect(providers[0].id).toBe("openai");
+  });
+});
+
+// ── initProviders — ensemble mode ──
+
+describe("initProviders — ensemble mode", () => {
   it("returns all providers when all keys available", () => {
     vi.stubEnv("OPENAI_API_KEY", "sk-1");
     vi.stubEnv("GOOGLE_API_KEY", "gk-1");
     vi.stubEnv("TOGETHER_API_KEY", "tk-1");
-    const providers = initProviders(makeConfig(), {});
+    const providers = initProviders(makeConfig(), { mode: "ensemble" });
     expect(providers).toHaveLength(3);
     expect(providers.map((p) => p.id)).toEqual(["openai", "google", "together"]);
   });
@@ -169,7 +214,7 @@ describe("initProviders from config", () => {
     delete process.env.TOGETHER_API_KEY;
     const providers = initProviders(
       makeConfig({ keys: { openai: null, google: null, together: null } }),
-      {},
+      { mode: "ensemble" },
     );
     expect(providers).toHaveLength(1);
     expect(providers[0].id).toBe("openai");
@@ -187,7 +232,7 @@ describe("initProviders from config", () => {
       ],
       keys: { openai: null, google: null, together: null },
     });
-    const providers = initProviders(config, {});
+    const providers = initProviders(config, { mode: "ensemble" });
     expect(providers.map((p) => p.id)).toEqual(["together", "openai"]);
   });
 
@@ -198,17 +243,43 @@ describe("initProviders from config", () => {
     const config = makeConfig({
       ensemble: { ...DEFAULT_CONFIG.ensemble, maxModels: 2 },
     });
-    const providers = initProviders(config, {});
+    const providers = initProviders(config, { mode: "ensemble" });
     expect(providers).toHaveLength(2);
     expect(providers.map((p) => p.id)).toEqual(["openai", "google"]);
   });
 
+  it("throws when maxModels is 0", () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-1");
+    const config = makeConfig({
+      ensemble: { ...DEFAULT_CONFIG.ensemble, maxModels: 0 },
+    });
+    expect(() => initProviders(config, { mode: "ensemble" })).toThrow(
+      /ensemble\.maxModels must be a positive integer/,
+    );
+  });
+
+  it("throws when maxModels is not an integer", () => {
+    vi.stubEnv("OPENAI_API_KEY", "sk-1");
+    const config = makeConfig({
+      ensemble: { ...DEFAULT_CONFIG.ensemble, maxModels: 1.5 },
+    });
+    expect(() => initProviders(config, { mode: "ensemble" })).toThrow(
+      /ensemble\.maxModels must be a positive integer/,
+    );
+  });
+});
+
+// ── initProviders — shared error cases ──
+
+describe("initProviders — error cases", () => {
   it("throws when zero providers have valid keys", () => {
     delete process.env.OPENAI_API_KEY;
     delete process.env.GOOGLE_API_KEY;
     delete process.env.TOGETHER_API_KEY;
     expect(() =>
-      initProviders(makeConfig({ keys: { openai: null, google: null, together: null } }), {}),
+      initProviders(makeConfig({ keys: { openai: null, google: null, together: null } }), {
+        mode: "single",
+      }),
     ).toThrow(/No providers available/);
   });
 
@@ -216,7 +287,7 @@ describe("initProviders from config", () => {
     const config = makeConfig({
       models: [{ provider: "anthropic", model: "claude-4" }],
     });
-    expect(() => initProviders(config, {})).toThrow(
+    expect(() => initProviders(config, { mode: "single" })).toThrow(
       /Unknown provider "anthropic" in config models/,
     );
   });
@@ -229,6 +300,6 @@ describe("initProviders from config", () => {
       models: [{ provider: "openai", model: "gpt-4.1" }],
       keys: { openai: "" },
     });
-    expect(() => initProviders(config, {})).toThrow(/No providers available/);
+    expect(() => initProviders(config, { mode: "ensemble" })).toThrow(/No providers available/);
   });
 });
