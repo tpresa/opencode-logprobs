@@ -69,13 +69,21 @@ describe("deepMergeConfig", () => {
     expect(result.retry.autoRetry).toBe(false);
   });
 
-  it("skips unknown keys during merge", () => {
+  it("skips unknown top-level keys during merge", () => {
     const result = deepMergeConfig(DEFAULT_CONFIG, {
       unknownKey: "value",
       scoring: { flagThreshold: 0.50 },
     });
     expect(result.scoring.flagThreshold).toBe(0.50);
     expect((result as unknown as Record<string, unknown>)["unknownKey"]).toBeUndefined();
+  });
+
+  it("skips unknown nested keys during merge", () => {
+    const result = deepMergeConfig(DEFAULT_CONFIG, {
+      scoring: { flagThreshold: 0.70, unknownNested: "bad" },
+    });
+    expect(result.scoring.flagThreshold).toBe(0.70);
+    expect((result.scoring as unknown as Record<string, unknown>)["unknownNested"]).toBeUndefined();
   });
 
   it("merges multiple sections at once", () => {
@@ -216,20 +224,18 @@ describe("loadConfig", () => {
   });
 
   it("returns defaults when no config is found during search", async () => {
-    // Mock cosmiconfig to simulate no config found
-    const { cosmiconfig } = await import("cosmiconfig");
-    const explorer = cosmiconfig("conf-agent");
-    vi.spyOn(explorer, "search").mockResolvedValue(null);
-
-    // Use the mock by mocking the module
-    vi.doMock("cosmiconfig", () => ({
-      cosmiconfig: () => explorer,
-    }));
-
-    // Re-import to pick up mock
-    const { loadConfig: loadConfigMocked } = await import("./config.js");
-    const result = await loadConfigMocked();
-    expect(result).toEqual(DEFAULT_CONFIG);
+    // Search from an isolated temp directory that has no config files.
+    // loadConfig() with no argument searches from cwd, so we override cwd.
+    const dir = makeTempDir();
+    tempDirs.push(dir);
+    const originalCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const result = await loadConfig();
+      expect(result).toEqual(DEFAULT_CONFIG);
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 
   it("throws 'not found' when explicit path does not exist", async () => {

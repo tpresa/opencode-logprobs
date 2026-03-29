@@ -72,7 +72,6 @@ export function deepMergeConfig(
 function deepMerge(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
-  parentKey?: string,
 ): Record<string, unknown> {
   const result = { ...target };
 
@@ -86,8 +85,8 @@ function deepMerge(
       continue;
     }
 
-    if (!(key in result) && parentKey === undefined) {
-      // Unknown top-level key — already warned by validateConfig, skip during merge.
+    if (!(key in result)) {
+      // Unknown key — already warned by validateConfig, skip during merge.
       continue;
     }
 
@@ -95,7 +94,6 @@ function deepMerge(
       result[key] = deepMerge(
         targetVal as Record<string, unknown>,
         sourceVal as Record<string, unknown>,
-        key,
       );
     } else {
       // Arrays and scalars: replace.
