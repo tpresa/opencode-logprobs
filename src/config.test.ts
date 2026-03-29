@@ -53,6 +53,14 @@ describe("deepMergeConfig", () => {
     expect(result.keys.together).toBeNull();
   });
 
+  it("preserves arbitrary provider names in keys", () => {
+    const result = deepMergeConfig(DEFAULT_CONFIG, {
+      keys: { anthropic: "sk-ant-..." },
+    });
+    expect(result.keys["anthropic"]).toBe("sk-ant-...");
+    expect(result.keys.openai).toBeNull();
+  });
+
   it("overrides scalar values", () => {
     const result = deepMergeConfig(DEFAULT_CONFIG, {
       retry: { maxRetries: 5 },
@@ -207,20 +215,43 @@ describe("loadConfig", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns defaults when no config path is provided and no config found", async () => {
-    // cosmiconfig search from cwd — won't find conf-agent config in a temp dir
-    const result = await loadConfig();
-    // Should at minimum return a valid Config (may find a real config on disk,
-    // but structurally must match Config shape)
-    expect(result).toHaveProperty("models");
-    expect(result).toHaveProperty("scoring");
-    expect(result).toHaveProperty("ensemble");
+  it("returns defaults when no config is found during search", async () => {
+    // Mock cosmiconfig to simulate no config found
+    const { cosmiconfig } = await import("cosmiconfig");
+    const explorer = cosmiconfig("conf-agent");
+    vi.spyOn(explorer, "search").mockResolvedValue(null);
+
+    // Use the mock by mocking the module
+    vi.doMock("cosmiconfig", () => ({
+      cosmiconfig: () => explorer,
+    }));
+
+    // Re-import to pick up mock
+    const { loadConfig: loadConfigMocked } = await import("./config.js");
+    const result = await loadConfigMocked();
+    expect(result).toEqual(DEFAULT_CONFIG);
   });
 
-  it("throws when explicit path does not exist", async () => {
+  it("throws 'not found' when explicit path does not exist", async () => {
     await expect(loadConfig("/nonexistent/path/config.json")).rejects.toThrow(
       "Config file not found"
     );
+  });
+
+  it("throws a parse error (not 'not found') for malformed config", async () => {
+    const dir = makeTempDir();
+    tempDirs.push(dir);
+    const filePath = join(dir, "config.json");
+    writeFileSync(filePath, "{ invalid json!!! }");
+
+    try {
+      await loadConfig(filePath);
+      expect.fail("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toContain("Failed to load config file");
+      expect((err as Error).message).not.toContain("Config file not found");
+    }
   });
 
   it("loads and merges config from explicit path", async () => {

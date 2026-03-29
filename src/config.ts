@@ -23,7 +23,10 @@ async function loadExplicit(filePath: string): Promise<Config> {
   try {
     result = await explorer.load(resolved);
   } catch (err: unknown) {
-    throw new Error(`Config file not found: ${resolved}`, { cause: err });
+    if (isEnoent(err)) {
+      throw new Error(`Config file not found: ${resolved}`, { cause: err });
+    }
+    throw new Error(`Failed to load config file: ${resolved}: ${err instanceof Error ? err.message : err}`, { cause: err });
   }
 
   if (!result || result.isEmpty) {
@@ -57,6 +60,8 @@ async function loadSearch(): Promise<Config> {
 
 // ── Deep merge ──
 
+const PASSTHROUGH_KEYS = new Set(["keys"]);
+
 export function deepMergeConfig(
   defaults: Config,
   loaded: Record<string, unknown>,
@@ -67,22 +72,30 @@ export function deepMergeConfig(
 function deepMerge(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
+  parentKey?: string,
 ): Record<string, unknown> {
   const result = { ...target };
 
   for (const key of Object.keys(source)) {
-    if (!(key in result)) {
-      // Unknown key — already warned by validateConfig, skip during merge.
+    const sourceVal = source[key];
+    const targetVal = result[key];
+
+    // For passthrough keys (e.g. "keys"), preserve arbitrary entries from source.
+    if (PASSTHROUGH_KEYS.has(key) && isPlainObject(sourceVal) && isPlainObject(targetVal)) {
+      result[key] = { ...targetVal, ...(sourceVal as Record<string, unknown>) };
       continue;
     }
 
-    const sourceVal = source[key];
-    const targetVal = result[key];
+    if (!(key in result) && parentKey === undefined) {
+      // Unknown top-level key — already warned by validateConfig, skip during merge.
+      continue;
+    }
 
     if (isPlainObject(sourceVal) && isPlainObject(targetVal)) {
       result[key] = deepMerge(
         targetVal as Record<string, unknown>,
         sourceVal as Record<string, unknown>,
+        key,
       );
     } else {
       // Arrays and scalars: replace.
@@ -238,4 +251,13 @@ function assertObject(v: unknown): asserts v is Record<string, unknown> {
   if (!isPlainObject(v)) {
     throw new Error("Config must be an object");
   }
+}
+
+function isEnoent(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: unknown }).code === "ENOENT"
+  );
 }
