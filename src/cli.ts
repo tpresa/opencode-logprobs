@@ -48,15 +48,15 @@ interface CLIOptions {
 
 async function run(prompt: string, options: CLIOptions): Promise<void> {
   const config = await loadConfig(options.config);
+  const mode = options.ensemble || config.ensemble.enabled ? "ensemble" : "single";
 
   let providers: Provider[];
   try {
-    providers = initProviders(config, options);
+    providers = initProviders(config, { ...options, mode });
   } catch (err) {
     console.error(chalk.red(`Error: ${(err as Error).message}`));
     process.exit(1);
   }
-  const mode = options.ensemble || config.ensemble.enabled ? "ensemble" : "single";
 
   const state: AgentState = {
     messages: [{ role: "user", content: prompt }],
