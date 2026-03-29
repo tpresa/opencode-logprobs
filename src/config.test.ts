@@ -224,17 +224,20 @@ describe("loadConfig", () => {
   });
 
   it("returns defaults when no config is found during search", async () => {
-    // Search from an isolated temp directory that has no config files.
-    // loadConfig() with no argument searches from cwd, so we override cwd.
+    // Isolate both cwd and HOME so cosmiconfig's global search
+    // (which walks up to homedir) cannot find a real config.
     const dir = makeTempDir();
     tempDirs.push(dir);
     const originalCwd = process.cwd();
-    process.chdir(dir);
+    const originalHome = process.env["HOME"];
     try {
+      process.chdir(dir);
+      process.env["HOME"] = dir;
       const result = await loadConfig();
       expect(result).toEqual(DEFAULT_CONFIG);
     } finally {
       process.chdir(originalCwd);
+      process.env["HOME"] = originalHome;
     }
   });
 
