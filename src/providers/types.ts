@@ -29,7 +29,10 @@ export interface ToolCallResult {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
-  tokenRange: [number, number];
+  // [start, end) into GenerationResult.tokens for this tool call's argument tokens.
+  // `null` means the provider did not expose per-token logprobs for this tool call —
+  // confidence is unknown, not zero. Scoring/display must treat null as "unscored".
+  tokenRange: [number, number] | null;
 }
 
 export interface GenerationResult {

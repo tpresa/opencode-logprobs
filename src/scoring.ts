@@ -15,6 +15,7 @@ export function score(result: GenerationResult): Scores {
 
   const toolCallScores = new Map<string, number>();
   for (const tc of result.toolCalls) {
+    if (tc.tokenRange === null) continue; // unscored — no logprobs available
     const [start, end] = tc.tokenRange;
     const tcTokens = result.tokens.slice(start, end);
     toolCallScores.set(tc.id, aggregate(tcTokens.map((t) => t.logprob)));
@@ -22,6 +23,7 @@ export function score(result: GenerationResult): Scores {
 
   const fileScores = new Map<string, number>();
   for (const tc of result.toolCalls) {
+    if (tc.tokenRange === null) continue;
     if (tc.name === "write_file" || tc.name === "edit_file") {
       const filePath = tc.arguments.path as string;
       const contentTokens = extractContentTokens(tc, result.tokens);
@@ -49,6 +51,7 @@ export function extractContentTokens(
   // Extract tokens belonging to the file content within a write_file/edit_file call.
   // For now, we use the full token range of the tool call as an approximation.
   // TODO: refine to only include tokens for the `content` / `new_content` argument.
+  if (tc.tokenRange === null) return [];
   const [start, end] = tc.tokenRange;
   return tokens.slice(start, end);
 }

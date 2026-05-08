@@ -116,6 +116,44 @@ describe("score", () => {
     const scores = score(result);
     expect(scores.files.size).toBe(0);
   });
+
+  it("omits unscored tool calls (tokenRange === null) from toolCallScores instead of emitting a fake 0", () => {
+    const result: GenerationResult = {
+      content: "",
+      tokens: [{ token: "a", logprob: -0.1, offset: 0 }],
+      toolCalls: [
+        { id: "scored", name: "read_file", arguments: { path: "foo.ts" }, tokenRange: [0, 1] },
+        { id: "unscored", name: "write_file", arguments: { path: "bar.ts", content: "x" }, tokenRange: null },
+      ],
+      model: "test",
+      provider: "test",
+      usage: { input: 5, output: 1 },
+      latencyMs: 50,
+    };
+
+    const scores = score(result);
+    expect(scores.toolCalls.has("scored")).toBe(true);
+    expect(scores.toolCalls.has("unscored")).toBe(false);
+    expect(scores.toolCalls.get("unscored")).toBeUndefined();
+  });
+
+  it("omits unscored write_file/edit_file from fileScores instead of emitting a fake 0", () => {
+    const result: GenerationResult = {
+      content: "",
+      tokens: [],
+      toolCalls: [
+        { id: "tc1", name: "write_file", arguments: { path: "src/a.ts", content: "code" }, tokenRange: null },
+        { id: "tc2", name: "edit_file", arguments: { path: "src/b.ts", old_content: "x", new_content: "y" }, tokenRange: null },
+      ],
+      model: "test",
+      provider: "test",
+      usage: { input: 5, output: 1 },
+      latencyMs: 50,
+    };
+
+    const scores = score(result);
+    expect(scores.files.size).toBe(0);
+  });
 });
 
 describe("confidenceBar", () => {

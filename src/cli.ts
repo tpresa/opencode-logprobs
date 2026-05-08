@@ -142,21 +142,31 @@ function displaySingleResult(result: GenerationResult, scores: Scores, config: C
 
   console.log(chalk.dim("\n  Tool calls:"));
   for (const tc of result.toolCalls) {
-    const conf = scores.toolCalls.get(tc.id) ?? 0;
-    const flag = isFlagged(conf, threshold) ? chalk.yellow(" ⚠️") : "";
+    const conf = scores.toolCalls.get(tc.id);
     const args = tc.name === "write_file" || tc.name === "edit_file" || tc.name === "read_file"
       ? ` ${tc.arguments.path}`
       : tc.name === "run_command"
         ? ` ${tc.arguments.command}`
         : "";
 
+    if (conf === undefined) {
+      console.log(
+        `    ${tc.name}${args}`.padEnd(50) + chalk.dim("—    (unscored: provider exposed no logprobs)")
+      );
+      continue;
+    }
+
+    const flag = isFlagged(conf, threshold) ? chalk.yellow(" ⚠️") : "";
     console.log(
       `    ${tc.name}${args}`.padEnd(50) +
       `${formatConfidence(conf)} ${confidenceBar(conf)}${flag}`
     );
   }
 
-  const flagged = result.toolCalls.filter((tc) => isFlagged(scores.toolCalls.get(tc.id) ?? 0, threshold));
+  const flagged = result.toolCalls.filter((tc) => {
+    const conf = scores.toolCalls.get(tc.id);
+    return conf !== undefined && isFlagged(conf, threshold);
+  });
   if (flagged.length > 0) {
     console.log(chalk.yellow(`\n  ⚠️  ${flagged.length} tool call(s) have low confidence.`));
   }
