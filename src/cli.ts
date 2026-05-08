@@ -137,7 +137,9 @@ function displaySingleResult(result: GenerationResult, scores: Scores, config: C
 
   console.log(
     chalk.bold(`\n🤖 ${result.model}`) +
-    chalk.dim(` — overall confidence: ${formatConfidence(scores.response)} ${confidenceBar(scores.response)}`)
+    (scores.response === null
+      ? chalk.dim(" — overall confidence: unscored (provider exposed no logprobs)")
+      : chalk.dim(` — overall confidence: ${formatConfidence(scores.response)} ${confidenceBar(scores.response)}`))
   );
 
   console.log(chalk.dim("\n  Tool calls:"));
@@ -182,7 +184,13 @@ function displayEnsembleResult(
   const models = Array.from(modelScores.entries());
   console.log(
     chalk.bold("\n🤖 Ensemble: ") +
-    models.map(([key, s]) => `${key} ${formatConfidence(s.response)}`).join(" | ")
+    models
+      .map(([key, s]) =>
+        s.response === null
+          ? `${key} ${chalk.dim("unscored")}`
+          : `${key} ${formatConfidence(s.response)}`
+      )
+      .join(" | ")
   );
 
   // Per-slot display
@@ -196,9 +204,12 @@ function displayEnsembleResult(
       const userPick = sel.reason === "user" && c.model === sel.picked
         ? chalk.yellow("  (within margin, user pick)")
         : "";
+      const score = c.confidence === null
+        ? chalk.dim("— (unscored)")
+        : `${formatConfidence(c.confidence)} ${confidenceBar(c.confidence)}`;
       console.log(
         `  │   ${c.model}`.padEnd(25) +
-        `${formatConfidence(c.confidence)} ${confidenceBar(c.confidence)}${selected}${userPick}`.padEnd(40) +
+        `${score}${selected}${userPick}`.padEnd(40) +
         "│"
       );
     }
@@ -267,7 +278,7 @@ function buildSingleSelections(result: GenerationResult, scores: Scores): Select
       candidates: [{
         model: modelKey,
         toolCall: tc,
-        confidence: scores.toolCalls.get(tc.id) ?? 0,
+        confidence: scores.toolCalls.get(tc.id) ?? null,
       }],
     },
     picked: modelKey,

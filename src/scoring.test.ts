@@ -42,9 +42,27 @@ describe("score", () => {
     };
 
     const scores = score(result);
+    expect(scores.response).not.toBeNull();
     expect(scores.response).toBeCloseTo(Math.exp(-0.1), 5);
     expect(scores.toolCalls.size).toBe(0);
     expect(scores.files.size).toBe(0);
+  });
+
+  it("returns null response score when no tokens have logprobs (e.g. OpenAI tool-call-only response)", () => {
+    const result: GenerationResult = {
+      content: "",
+      tokens: [],
+      toolCalls: [
+        { id: "tc1", name: "write_file", arguments: { path: "x.ts", content: "y" }, tokenRange: null },
+      ],
+      model: "test",
+      provider: "test",
+      usage: { input: 10, output: 5 },
+      latencyMs: 100,
+    };
+
+    const scores = score(result);
+    expect(scores.response).toBeNull();
   });
 
   it("scores tool calls using their token ranges", () => {

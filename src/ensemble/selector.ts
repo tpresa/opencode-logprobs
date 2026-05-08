@@ -16,16 +16,28 @@ export function autoSelect(
   marginThreshold = 0.10
 ): Selection[] {
   return slots.map((slot) => {
-    const sorted = [...slot.candidates].sort((a, b) => b.confidence - a.confidence);
+    // Scored candidates rank above unscored; unscored carry no signal so they
+    // sort last regardless of order. We compare margin only between scored
+    // candidates; a slot with no scored candidates defers to the user.
+    const scored = slot.candidates
+      .filter((c): c is typeof c & { confidence: number } => c.confidence !== null)
+      .sort((a, b) => b.confidence - a.confidence);
+    const unscored = slot.candidates.filter((c) => c.confidence === null);
 
-    if (sorted.length === 1) {
-      return { slot, picked: sorted[0].model, reason: "auto" as const, margin: 1.0 };
+    if (scored.length === 0) {
+      // No confidence signal anywhere — picking is arbitrary, so defer to user.
+      return { slot, picked: unscored[0].model, reason: "user" as const, margin: 0 };
     }
 
-    const margin = sorted[0].confidence - sorted[1].confidence;
+    if (scored.length === 1) {
+      // One scored candidate beats any number of unscored candidates outright.
+      return { slot, picked: scored[0].model, reason: "auto" as const, margin: 1.0 };
+    }
+
+    const margin = scored[0].confidence - scored[1].confidence;
     return {
       slot,
-      picked: sorted[0].model,
+      picked: scored[0].model,
       reason: margin >= marginThreshold ? ("auto" as const) : ("user" as const),
       margin,
     };

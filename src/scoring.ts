@@ -3,7 +3,10 @@ import type { GenerationResult, ToolCallResult, TokenLogprob } from "./providers
 // ── Score types ──
 
 export interface Scores {
-  response: number;
+  // null = unscored: the provider exposed no token-level logprobs for the
+  // assistant response (e.g. OpenAI Chat Completions returning a tool-call-only
+  // response, where logprobs.content is null). Distinct from low confidence.
+  response: number | null;
   toolCalls: Map<string, number>;  // tool call ID → confidence
   files: Map<string, number>;      // file path → confidence
 }
@@ -11,7 +14,9 @@ export interface Scores {
 // ── Main scoring function ──
 
 export function score(result: GenerationResult): Scores {
-  const responseScore = aggregate(result.tokens.map((t) => t.logprob));
+  const responseScore = result.tokens.length === 0
+    ? null
+    : aggregate(result.tokens.map((t) => t.logprob));
 
   const toolCallScores = new Map<string, number>();
   for (const tc of result.toolCalls) {

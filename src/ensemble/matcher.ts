@@ -11,7 +11,10 @@ export interface ToolCallSlot {
 export interface ToolCallCandidate {
   model: string;
   toolCall: ToolCallResult;
-  confidence: number;
+  // null = unscored: the provider exposed no logprobs for this tool call's
+  // arguments. Distinct from a low/zero score and must not be coerced to 0
+  // for ranking or display.
+  confidence: number | null;
 }
 
 // ── Match tool calls across models into slots ──
@@ -28,7 +31,7 @@ export function matchToolCalls(ensemble: EnsembleResult): ToolCallSlot[] {
       }
 
       const modelScores = ensemble.scores.get(modelKey);
-      const confidence = modelScores?.toolCalls.get(tc.id) ?? 0;
+      const confidence = modelScores?.toolCalls.get(tc.id) ?? null;
 
       slots.get(slotKey)!.candidates.push({
         model: modelKey,
