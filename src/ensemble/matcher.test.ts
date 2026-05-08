@@ -137,4 +137,31 @@ describe("matchToolCalls", () => {
     const slots = matchToolCalls(ensemble);
     expect(slots).toHaveLength(0);
   });
+
+  it("carries null confidence for tool calls absent from scores.toolCalls (no fake-zero coercion)", () => {
+    const ensemble: EnsembleResult = {
+      results: new Map([
+        ["openai:gpt-4.1", makeResult([
+          // tokenRange null marks this tool call as unscored at the provider layer
+          { id: "a1", name: "write_file", arguments: { path: "src/a.ts" }, tokenRange: null },
+        ])],
+        ["google:gemini", makeResult([
+          { id: "b1", name: "write_file", arguments: { path: "src/a.ts" }, tokenRange: [0, 3] },
+        ])],
+      ]),
+      scores: new Map([
+        // a1 deliberately absent — score() omits unscored tool calls from this map
+        ["openai:gpt-4.1", makeScores({})],
+        ["google:gemini", makeScores({ b1: 0.72 })],
+      ]),
+    };
+
+    const slots = matchToolCalls(ensemble);
+    expect(slots).toHaveLength(1);
+    const candidates = slots[0].candidates;
+    const openai = candidates.find((c) => c.model === "openai:gpt-4.1");
+    const google = candidates.find((c) => c.model === "google:gemini");
+    expect(openai?.confidence).toBeNull();
+    expect(google?.confidence).toBe(0.72);
+  });
 });

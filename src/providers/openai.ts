@@ -94,11 +94,37 @@ function extractTokenLogprobs(
 function extractToolCalls(
   toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[]
 ): ToolCallResult[] {
-  // TODO: map token ranges once we correlate logprobs to tool call boundaries
-  return toolCalls.map((tc) => ({
-    id: tc.id,
-    name: tc.function.name,
-    arguments: JSON.parse(tc.function.arguments),
-    tokenRange: [0, 0] as [number, number], // placeholder — needs logprob correlation
-  }));
+  // tokenRange is null because OpenAI Chat Completions does not return logprobs for
+  // tool-call argument tokens: when finish_reason === "tool_calls", choice.logprobs.content
+  // is null (and sometimes the whole `logprobs` object is null). Verified empirically in
+  // OpenAI Community thread #579561 and instructor#1223. The documented unblock is to
+  // switch the request from `tools` to Structured Outputs (`response_format: json_schema`),
+  // where logprobs.content IS populated for the JSON tokens — deferred to a follow-up.
+  const results: ToolCallResult[] = [];
+  for (const tc of toolCalls) {
+    const args = parseArguments(tc.function.arguments, tc.id);
+    if (args === null) continue;
+    results.push({
+      id: tc.id,
+      name: tc.function.name,
+      arguments: args,
+      tokenRange: null,
+    });
+  }
+  return results;
+}
+
+function parseArguments(raw: string, toolCallId: string): Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      console.warn(`OpenAI provider: tool call ${toolCallId} arguments are not a JSON object — skipping.`);
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`OpenAI provider: failed to parse arguments for tool call ${toolCallId}: ${message}`);
+    return null;
+  }
 }
